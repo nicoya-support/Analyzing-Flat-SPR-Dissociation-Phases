@@ -113,13 +113,33 @@
             background-color: var(--yellow);
             color: var(--dark-blue);
         }
+        
+        .toggle-btn {
+            background-color: var(--light-grey);
+            color: var(--dark-grey);
+            border: 2px solid var(--dark-grey);
+            flex: 1;
+            text-align: center;
+        }
+        
+        .toggle-btn.active-artifact {
+            background-color: #E32636;
+            color: white;
+            border-color: #E32636;
+        }
+
+        .toggle-btn.active-fixed {
+            background-color: #78C257; 
+            color: white;
+            border-color: #78C257;
+        }
 
         canvas {
             max-width: 100%;
             margin-top: 20px;
         }
 
-        ol {
+        ol, ul {
             margin-bottom: 20px;
             padding-left: 20px;
         }
@@ -134,6 +154,30 @@
             padding: 15px;
             margin-top: 15px;
             font-size: 0.95em;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .comparison-table th, .comparison-table td {
+            border: 1px solid var(--light-grey);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background-color: var(--light-grey);
+            color: var(--dark-blue);
+        }
+
+        .sub-section {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px dashed var(--light-grey);
         }
     </style>
 </head>
@@ -234,16 +278,6 @@
     </div>
 
     <div class="card">
-        <h2>Implementation in the Nicosystem</h2>
-        <p>You can force the software to recognize this physical limit by setting the parameter manually.</p>
-        <ol>
-            <li>Go to <strong>Model and Accommodation</strong>.</li>
-            <li>Set the $k_d$ to constant using the limit value which corresponds to your dissociation time.</li>
-            <li>Select <strong>Apply Locally</strong> to run the fit with this boundary.</li>
-        </ol>
-    </div>
-
-    <div class="card">
         <h2>Handling Replicates and Baseline Variability</h2>
         <p>When evaluating multiple replicates, slight variations in the baseline can occur. This is a common aspect of instrument performance. However, this variability can complicate analysis if the algorithm attempts to fit these minor fluctuations as true dissociation events. Ensure proper double-referencing is applied to remove systematic background noise. Buffer Blanks are available on SW ver 2.6.0+ to assist with this subtraction.</p>
         
@@ -262,7 +296,74 @@
         <canvas id="replicateChart"></canvas>
     </div>
 
+    <h2>Identifying and Resolving Experimental Artifacts</h2>
+
+    <p>A flat dissociation phase does not always indicate a high-affinity interaction. Experimental artifacts can trap the analyte on the sensor surface, artificially simulating a slow dissociation rate. Recognizing these artifacts is critical for accurate data interpretation. Common experimental factors include:</p>
+
+    <ul>
+        <li><strong>Mass Transport Limitation (Rebinding):</strong> High ligand density ($R_{max}$) prevents the analyte from diffusing away into the bulk flow. Upon dissociation, the analyte immediately rebinds to an adjacent ligand. Fix this by immobilizing less ligand to achieve a lower capacity.</li>
+        
+        <li><strong>Avidity Effects:</strong> Multivalent analytes (e.g., bivalent antibodies) bind to multiple target sites simultaneously on a densely packed surface. The probability of all binding sites dissociating simultaneously is extremely low, resulting in a flat response. Fix this by inverting the assay orientation. Immobilize the multivalent molecule and flow the monomeric target as the analyte.</li>
+        
+        <li><strong>Non-Specific Binding (NSB):</strong> Analytes may interact directly with the sensor matrix due to electrostatic or hydrophobic forces, independent of the target ligand. Standard running buffers already contain 0.1% Tween-20, which may not be enough. Fix this by monitoring the reference channel for NSB and adjusting the running buffer. Increase the salt concentration (e.g., 300-500 mM NaCl), or add blocking agents like BSA (1 mg/mL) or soluble dextran (1 mg/mL) to disrupt these secondary interactions.</li>
+        
+        <li><strong>Analyte Aggregation:</strong> Poor sample stability can lead to protein aggregation on the sensor surface. This mass accumulates and does not dissociate. Fix this by centrifuging samples immediately prior to analysis and adjusting buffer conditions to maintain protein solubility.</li>
+    </ul>
+
+    <div class="card">
+        <h2>3. Artifact Correction Simulator</h2>
+        <p>Select a common experimental artifact below to visualize the skewed sensorgram. Toggle to the corrected data state to observe how adjusting the experimental design resolves the issue and reveals the true kinetic interaction.</p>
+        
+        <div class="input-group">
+            <label for="artifactType">Select Artifact Type:</label>
+            <select id="artifactType" onchange="updateArtifactChart()">
+                <option value="rebinding">Mass Transport Limitation (Rebinding)</option>
+                <option value="avidity">Avidity Effects (Multivalent Binding)</option>
+                <option value="nsb">Non-Specific Binding (NSB)</option>
+                <option value="aggregation">Analyte Aggregation</option>
+            </select>
+        </div>
+
+        <div class="button-row" style="margin-top: 15px;">
+            <button id="btnArtifact" class="toggle-btn active-artifact" onclick="setFixState(false)">View Artifact Data</button>
+            <button id="btnFixed" class="toggle-btn" onclick="setFixState(true)">View Corrected Data</button>
+        </div>
+        
+        <div id="artifactExplanation" class="example-box">
+            </div>
+
+        <canvas id="artifactChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Implementation in the Nicosystem</h2>
+        <p>Here is how you can apply these concepts directly in your analysis software to ensure your results reflect physical reality.</p>
+        
+        <div class="sub-section" style="border-top: none; padding-top: 0; margin-top: 0;">
+            <h3>Method A: Setting a Limit Boundary</h3>
+            <p>You can force the software to recognize the physical limitation of your experiment by setting the parameter manually.</p>
+            <ol>
+                <li>Go to the <strong>Model and Accommodation</strong> section.</li>
+                <li>Set the $k_d$ parameter to <strong>constant</strong>.</li>
+                <li>Enter the $k_{d\_min}$ limit value you calculated based on your dissociation time.</li>
+                <li>Select <strong>Apply Locally</strong> to run the final fit with this boundary locked in place.</li>
+            </ol>
+        </div>
+
+        <div class="sub-section">
+            <h3>Method B: Fitting the Off-Rate First</h3>
+            <p>Sometimes, the algorithm struggles to fit the entire sensorgram when the off-rate is non-uniform, leading to poor $k_a$ values. You can guide the algorithm by isolating the dissociation phase first.</p>
+            <ol>
+                <li>Adjust your Model and Accomodation model to the <strong>Off Rate Model</strong>.</li>
+                <li>Fit this specific section locally to determine the best possible $k_d$ value based strictly on the decay.</li>
+                <li>Go to <strong>Model and Accommodation</strong> and lock this resulting $k_d$ value as a constant parameter.</li>
+                <li>Select <strong>Apply Locally</strong> to run the final fit with this boundary locked in place.</li>
+            </ol>
+        </div>
+    </div>
+
     <script>
+        // Formats numbers into scientific notation with HTML superscripts
         function formatSciHtml(num) {
             if (!num || num === 0) return "0";
             let str = num.toExponential(2);
@@ -272,6 +373,7 @@
             return `${base} &times; 10<sup>${exp}</sup>`;
         }
 
+        // Limit Calculator Function
         function updateCalculator() {
             const td = parseFloat(document.getElementById('dissocTimeCalc').value);
             if (!td || td <= 0) return;
@@ -298,29 +400,24 @@
             }
         }
 
-        // Sim Chart logic
+        // Kinetic Simulator Functions
+        let chartInstance = null;
+
         function setScenario(type) {
             const targetKD = parseFloat(document.getElementById('targetKdInput').value) || 1e-9;
             let ka, kd;
 
-            if (type === 'fast') {
-                ka = 1e7;
-            } else if (type === 'medium') {
-                ka = 1e6;
-            } else if (type === 'slow') {
-                ka = 1e5;
-            } else if (type === 'limit') {
-                ka = 1e4; 
-            }
+            if (type === 'fast') { ka = 1e7; } 
+            else if (type === 'medium') { ka = 1e6; } 
+            else if (type === 'slow') { ka = 1e5; } 
+            else if (type === 'limit') { ka = 1e4; }
             kd = ka * targetKD;
 
             let topConc = targetKD * 10;
             const targetKobs = 0.01;
             const requiredConc = (targetKobs - kd) / ka;
             
-            if (requiredConc > topConc) {
-                topConc = requiredConc;
-            }
+            if (requiredConc > topConc) { topConc = requiredConc; }
 
             document.getElementById('simKa').value = ka.toExponential(1);
             document.getElementById('simKd').value = kd.toExponential(1);
@@ -330,8 +427,6 @@
 
             updateChart();
         }
-
-        let chartInstance = null;
 
         function simulatePhase(C, R0, duration, ka, kd, Rmax, isAssoc, startTime) {
             let data = [];
@@ -361,85 +456,33 @@
 
             if (isNaN(ka) || isNaN(kd) || isNaN(Rmax) || isNaN(topConc) || isNaN(ta) || isNaN(td)) return;
 
-            const concs = [
-                topConc / 81, 
-                topConc / 27, 
-                topConc / 9, 
-                topConc / 3, 
-                topConc
-            ];
-            
+            const concs = [topConc / 81, topConc / 27, topConc / 9, topConc / 3, topConc];
             let datasets = [];
-            
-            const assocColors = [
-                '#9932CC', 
-                '#E32636', 
-                '#78C257', 
-                '#4DB8A6', 
-                '#F28E2B'  
-            ];
+            const assocColors = ['#9932CC', '#E32636', '#78C257', '#4DB8A6', '#F28E2B'];
             const dissocColor = '#59C3E3'; 
 
             if (mode === "SCK") {
                 let currentTime = 0;
                 let currentR = 0;
-
                 for (let i = 0; i < concs.length; i++) {
                     let phaseData = simulatePhase(concs[i], currentR, ta, ka, kd, Rmax, true, currentTime);
-                    
-                    datasets.push({
-                        label: `Conc ${i+1}`,
-                        data: phaseData,
-                        borderColor: assocColors[i],
-                        borderWidth: 2,
-                        fill: false,
-                        pointRadius: 0
-                    });
-
+                    datasets.push({ label: `Conc ${i+1}`, data: phaseData, borderColor: assocColors[i], borderWidth: 2, fill: false, pointRadius: 0 });
                     currentTime += ta;
                     currentR = phaseData[phaseData.length - 1].y;
                 }
-                
                 let dissocData = simulatePhase(0, currentR, td, ka, kd, Rmax, false, currentTime);
-                datasets.push({
-                    label: `Dissociation`,
-                    data: dissocData,
-                    borderColor: dissocColor,
-                    borderWidth: 2,
-                    fill: false,
-                    pointRadius: 0
-                });
-
+                datasets.push({ label: `Dissociation`, data: dissocData, borderColor: dissocColor, borderWidth: 2, fill: false, pointRadius: 0 });
             } else {
                 for (let i = 0; i < concs.length; i++) {
                     let assocData = simulatePhase(concs[i], 0, ta, ka, kd, Rmax, true, 0);
                     let lastR = assocData[assocData.length - 1].y;
                     let dissocData = simulatePhase(0, lastR, td, ka, kd, Rmax, false, ta);
-
-                    datasets.push({
-                        label: `Conc ${i+1}`,
-                        data: assocData,
-                        borderColor: assocColors[i],
-                        borderWidth: 2,
-                        fill: false,
-                        pointRadius: 0
-                    });
-
-                    datasets.push({
-                        label: `Dissociation`,
-                        data: dissocData,
-                        borderColor: dissocColor,
-                        borderWidth: 2,
-                        fill: false,
-                        pointRadius: 0
-                    });
+                    datasets.push({ label: `Conc ${i+1}`, data: assocData, borderColor: assocColors[i], borderWidth: 2, fill: false, pointRadius: 0 });
+                    datasets.push({ label: `Dissociation`, data: dissocData, borderColor: dissocColor, borderWidth: 2, fill: false, pointRadius: 0 });
                 }
             }
 
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-
+            if (chartInstance) { chartInstance.destroy(); }
             const cleanMax = Math.ceil(Rmax * 1.1);
             const ctx = document.getElementById('sprChart').getContext('2d');
             chartInstance = new Chart(ctx, {
@@ -449,22 +492,9 @@
                     responsive: true,
                     animation: false,
                     scales: {
-                        x: {
-                            type: 'linear',
-                            title: { display: true, text: 'Time (s)' },
-                            grid: { color: '#e0e0e0' }
-                        },
-                        y: {
-                            title: { display: true, text: 'Response (RU)' },
-                            min: 0,
-                            max: cleanMax,
-                            grid: { color: '#e0e0e0' },
-                            ticks: {
-                                callback: function(value) {
-                                    if (Math.floor(value) === value) return value;
-                                    return value.toFixed(1);
-                                }
-                            }
+                        x: { type: 'linear', title: { display: true, text: 'Time (s)' }, grid: { color: '#e0e0e0' } },
+                        y: { title: { display: true, text: 'Response (RU)' }, min: 0, max: cleanMax, grid: { color: '#e0e0e0' },
+                            ticks: { callback: function(value) { return Math.floor(value) === value ? value : value.toFixed(1); } }
                         }
                     },
                     plugins: {
@@ -477,32 +507,6 @@
                                         return item.datasetIndex === firstIndex;
                                     }
                                     return true;
-                                }
-                            },
-                            onClick: function(e, legendItem, legend) {
-                                const ci = legend.chart;
-                                const label = legendItem.text;
-
-                                if (label === 'Dissociation') {
-                                    const firstIndex = ci.data.datasets.findIndex(ds => ds.label === 'Dissociation');
-                                    const isVisible = ci.isDatasetVisible(firstIndex);
-
-                                    ci.data.datasets.forEach((ds, i) => {
-                                        if (ds.label === 'Dissociation') {
-                                            if (isVisible) {
-                                                ci.hide(i);
-                                            } else {
-                                                ci.show(i);
-                                            }
-                                        }
-                                    });
-                                } else {
-                                    const index = legendItem.datasetIndex;
-                                    if (ci.isDatasetVisible(index)) {
-                                        ci.hide(index);
-                                    } else {
-                                        ci.show(index);
-                                    }
                                 }
                             }
                         }
@@ -517,20 +521,13 @@
         function setReplicateScenario(type) {
             let datasets = [];
             const duration = 600;
-            const points = 100;
-            const dt = duration / points;
-            
-            // Replicate Colors
+            const dt = duration / 100;
             const repColors = ['#212B38', '#67CBDF', '#E9C259'];
-            
             let data1 = [], data2 = [], data3 = [];
             let descText = "";
 
-            // Threshold line data (95 RU)
             let thresholdData = [];
-            for (let t = 0; t <= duration; t += dt) {
-                thresholdData.push({ x: t, y: 95 });
-            }
+            for (let t = 0; t <= duration; t += dt) { thresholdData.push({ x: t, y: 95 }); }
 
             if (type === 'ideal') {
                 descText = "<strong>Example 1: Consistent Flat Baselines.</strong> All replicates decay by less than 5%. Calculate $k_{d\\_min}$ based on the observation time and report this limit for the entire dataset.";
@@ -540,66 +537,32 @@
                     data3.push({ x: t, y: 100 - (t * 0.0005) });
                 }
             } else if (type === 'slight') {
-                descText = "<strong>Example 2: Slight Variability.</strong> The baseline varies between replicates (one drifts slightly up, another down), but none cross the 5% decay threshold. Do not average the values. Report the calculated limit, as the variance falls within the instrument noise threshold.";
+                descText = "<strong>Example 2: Slight Variability.</strong> The baseline varies between replicates, but none cross the 5% decay threshold. Do not average the values. Report the calculated limit.";
                 for (let t = 0; t <= duration; t += dt) {
-                    data1.push({ x: t, y: 100 + (t * 0.002) }); // Upward drift
-                    data2.push({ x: t, y: 100 - (t * 0.004) }); // Downward drift, still above 95
-                    data3.push({ x: t, y: 100 - (t * 0.001) }); // Flat
+                    data1.push({ x: t, y: 100 + (t * 0.002) }); 
+                    data2.push({ x: t, y: 100 - (t * 0.004) }); 
+                    data3.push({ x: t, y: 100 - (t * 0.001) }); 
                 }
             } else if (type === 'mixed') {
-                descText = "<strong>Example 3: Mixed Results.</strong> One replicate decays beyond the 5% threshold, while the others remain flat. You cannot average a true numerical value with a limit. Evaluate the methodology for the outlier, or report the single measurable $k_d$ while noting the others were below the detection limit.";
+                descText = "<strong>Example 3: Mixed Results.</strong> One replicate decays beyond the 5% threshold, while the others remain flat. You cannot average a true numerical value with a limit. Evaluate the methodology for the outlier.";
                 for (let t = 0; t <= duration; t += dt) {
-                    data1.push({ x: t, y: 100 - (t * 0.001) }); // Flat
-                    data2.push({ x: t, y: 100 - (t * 0.015) }); // Decays past 95
-                    data3.push({ x: t, y: 100 - (t * 0.002) }); // Flat
+                    data1.push({ x: t, y: 100 - (t * 0.001) }); 
+                    data2.push({ x: t, y: 100 - (t * 0.015) }); 
+                    data3.push({ x: t, y: 100 - (t * 0.002) }); 
                 }
             }
 
             document.getElementById('replicateDescription').innerHTML = descText;
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise([document.getElementById('replicateDescription')]);
-            }
+            if (window.MathJax && window.MathJax.typesetPromise) { window.MathJax.typesetPromise([document.getElementById('replicateDescription')]); }
 
             datasets = [
-                {
-                    label: 'Replicate 1',
-                    data: data1,
-                    borderColor: repColors[0],
-                    borderWidth: 2,
-                    fill: false,
-                    pointRadius: 0
-                },
-                {
-                    label: 'Replicate 2',
-                    data: data2,
-                    borderColor: repColors[1],
-                    borderWidth: 2,
-                    fill: false,
-                    pointRadius: 0
-                },
-                {
-                    label: 'Replicate 3',
-                    data: data3,
-                    borderColor: repColors[2],
-                    borderWidth: 2,
-                    fill: false,
-                    pointRadius: 0
-                },
-                {
-                    label: '5% Decay Threshold',
-                    data: thresholdData,
-                    borderColor: '#E32636', // Red
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0
-                }
+                { label: 'Replicate 1', data: data1, borderColor: repColors[0], borderWidth: 2, fill: false, pointRadius: 0 },
+                { label: 'Replicate 2', data: data2, borderColor: repColors[1], borderWidth: 2, fill: false, pointRadius: 0 },
+                { label: 'Replicate 3', data: data3, borderColor: repColors[2], borderWidth: 2, fill: false, pointRadius: 0 },
+                { label: '5% Decay Threshold', data: thresholdData, borderColor: '#E32636', borderWidth: 2, borderDash: [5, 5], fill: false, pointRadius: 0 }
             ];
 
-            if (repChartInstance) {
-                repChartInstance.destroy();
-            }
-
+            if (repChartInstance) { repChartInstance.destroy(); }
             const ctx = document.getElementById('replicateChart').getContext('2d');
             repChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -608,29 +571,252 @@
                     responsive: true,
                     animation: false,
                     scales: {
-                        x: {
-                            type: 'linear',
-                            title: { display: true, text: 'Time (s)' },
-                            grid: { color: '#e0e0e0' }
-                        },
-                        y: {
-                            title: { display: true, text: 'Normalized Response (RU)' },
-                            min: 80,
-                            max: 110,
-                            grid: { color: '#e0e0e0' }
-                        }
+                        x: { type: 'linear', title: { display: true, text: 'Time (s)' }, grid: { color: '#e0e0e0' } },
+                        y: { title: { display: true, text: 'Normalized Response (RU)' }, min: 80, max: 110, grid: { color: '#e0e0e0' } }
                     },
-                    plugins: {
-                        legend: { display: true }
-                    }
+                    plugins: { legend: { display: true } }
                 }
             });
         }
 
-        // Initialize everything
+        // Artifact Simulator Logic
+        let artifactChartInstance = null;
+        let isFixed = false;
+
+        function setFixState(state) {
+            isFixed = state;
+            const btnArt = document.getElementById('btnArtifact');
+            const btnFix = document.getElementById('btnFixed');
+            
+            if (isFixed) {
+                btnFix.classList.add('active-fixed');
+                btnArt.classList.remove('active-artifact');
+            } else {
+                btnArt.classList.add('active-artifact');
+                btnFix.classList.remove('active-fixed');
+            }
+            updateArtifactChart();
+        }
+
+        function generateArtifactData(type, fixed) {
+            let ta = 180;
+            let td = 400;
+            let dt = (ta + td) / 100;
+            let data = [];
+            let ka = 1e5;
+            let C = 1e-7;
+
+            if (type === 'rebinding') {
+                let Rmax = fixed ? 50 : 400;
+                let trueKd = fixed ? 1e-2 : 1e-6; 
+                for (let t = 0; t <= ta+td; t+=dt) {
+                    if (t <= ta) {
+                        let req = (C * ka * Rmax) / (C * ka + trueKd);
+                        let kobs = C * ka + trueKd;
+                        data.push({x: t, y: req * (1 - Math.exp(-kobs * t))});
+                    } else {
+                        let r0 = data[data.length-1].y;
+                        data.push({x: t, y: r0 * Math.exp(-trueKd * (t-ta))});
+                    }
+                }
+            } else if (type === 'avidity') {
+                let Rmax = 100;
+                let trueKd = fixed ? 5e-3 : 1e-7; 
+                for (let t = 0; t <= ta+td; t+=dt) {
+                    if (t <= ta) {
+                        let req = (C * ka * Rmax) / (C * ka + trueKd);
+                        let kobs = C * ka + trueKd;
+                        data.push({x: t, y: req * (1 - Math.exp(-kobs * t))});
+                    } else {
+                        let r0 = data[data.length-1].y;
+                        data.push({x: t, y: r0 * Math.exp(-trueKd * (t-ta))});
+                    }
+                }
+            } else if (type === 'nsb') {
+                let Rmax = 100;
+                let trueKd = 5e-3;
+                let nsbRate = fixed ? 0 : 0.2; 
+                for (let t = 0; t <= ta+td; t+=dt) {
+                    if (t <= ta) {
+                        let req = (C * ka * Rmax) / (C * ka + trueKd);
+                        let kobs = C * ka + trueKd;
+                        data.push({x: t, y: req * (1 - Math.exp(-kobs * t)) + (nsbRate * t)});
+                    } else {
+                        let req = (C * ka * Rmax) / (C * ka + trueKd);
+                        let r0 = req + (nsbRate * ta); 
+                        let baseCurve = req * Math.exp(-trueKd * (t-ta));
+                        let stuckPortion = nsbRate * ta; 
+                        data.push({x: t, y: baseCurve + stuckPortion});
+                    }
+                }
+            } else if (type === 'aggregation') {
+                let Rmax = 100;
+                let trueKd = 2e-3;
+                for (let t = 0; t <= ta+td; t+=dt) {
+                    if (t <= ta) {
+                        if (!fixed) {
+                            data.push({x: t, y: (t*t) * 0.005}); 
+                        } else {
+                            let req = (C * ka * Rmax) / (C * ka + trueKd);
+                            let kobs = C * ka + trueKd;
+                            data.push({x: t, y: req * (1 - Math.exp(-kobs * t))});
+                        }
+                    } else {
+                        let r0 = data[data.length-1].y;
+                        if (!fixed) {
+                            data.push({x: t, y: r0});
+                        } else {
+                            data.push({x: t, y: r0 * Math.exp(-trueKd * (t-ta))});
+                        }
+                    }
+                }
+            }
+            return data;
+        }
+
+        function updateArtifactChart() {
+            const type = document.getElementById('artifactType').value;
+            const data = generateArtifactData(type, isFixed);
+            
+            let explText = "";
+            let maxY = 150;
+
+            if (type === 'rebinding') {
+                maxY = isFixed ? 60 : 450;
+                explText = `
+                    <table class="comparison-table">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Artifact State</th>
+                            <th>Adjusted State</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Capacity ($R_{max}$)</strong></td>
+                            <td>400 RU (Overloaded)</td>
+                            <td>50 RU (Lowered)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Observed $k_d$</strong></td>
+                            <td>$1.0 \\times 10^{-6}$ s$^{-1}$ (Flat)</td>
+                            <td>$1.0 \\times 10^{-2}$ s$^{-1}$ (True curve)</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3"><strong>Fix Applied:</strong> Ligand immobilization density was reduced to minimize mass transport limitations, allowing the analyte to freely diffuse away from the surface during the dissociation phase.</td>
+                        </tr>
+                    </table>
+                `;
+            } else if (type === 'avidity') {
+                explText = `
+                    <table class="comparison-table">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Artifact State</th>
+                            <th>Adjusted State</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Assay Orientation</strong></td>
+                            <td>Analyte is Multivalent (e.g., Antibody)</td>
+                            <td>Analyte is Monomeric (e.g., Target Antigen)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Observed $k_d$</strong></td>
+                            <td>$1.0 \\times 10^{-7}$ s$^{-1}$ (Artificially slow)</td>
+                            <td>$5.0 \\times 10^{-3}$ s$^{-1}$ (True 1:1 kinetics)</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3"><strong>Fix Applied:</strong> The assay orientation was inverted. Immobilizing the bivalent antibody and utilizing the monomer as the analyte eliminates multiple surface contact points, revealing the true 1:1 interaction kinetics.</td>
+                        </tr>
+                    </table>
+                `;
+            } else if (type === 'nsb') {
+                maxY = 180;
+                explText = `
+                    <table class="comparison-table">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Artifact State</th>
+                            <th>Adjusted State</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Running Buffer</strong></td>
+                            <td>Standard Buffer</td>
+                            <td>Adjusted Buffer (+ 300mM NaCl / 1 mg/mL BSA)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Baseline Trajectory</strong></td>
+                            <td>Linear positive drift during and after injection</td>
+                            <td>Stable return to zero post-dissociation</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3"><strong>Fix Applied:</strong> The addition of blocking agents and adjusted salt concentrations disrupted secondary electrostatic and hydrophobic interactions with the sensor matrix, eliminating non-specific analyte accumulation.</td>
+                        </tr>
+                    </table>
+                `;
+            } else if (type === 'aggregation') {
+                maxY = 200;
+                explText = `
+                    <table class="comparison-table">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Artifact State</th>
+                            <th>Adjusted State</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Sample Prep</strong></td>
+                            <td>Stored analyte directly injected</td>
+                            <td>Centrifuged immediately prior to run</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Curve Profile</strong></td>
+                            <td>Exponential signal increase, no steady-state</td>
+                            <td>Standard Langmuir association to steady-state</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3"><strong>Fix Applied:</strong> Centrifugation successfully sedimented protein aggregates from the bulk solution. The assay now measures the interaction of stable, soluble monomers rather than accumulating insoluble mass.</td>
+                        </tr>
+                    </table>
+                `;
+            }
+
+            document.getElementById('artifactExplanation').innerHTML = explText;
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([document.getElementById('artifactExplanation')]);
+            }
+
+            const lineColor = isFixed ? '#78C257' : '#E32636'; 
+            const labelText = isFixed ? 'Adjusted Data' : 'Artifact Data';
+
+            const dataset = [{
+                label: labelText,
+                data: data,
+                borderColor: lineColor,
+                borderWidth: 3,
+                fill: false,
+                pointRadius: 0
+            }];
+
+            if (artifactChartInstance) { artifactChartInstance.destroy(); }
+            const ctx = document.getElementById('artifactChart').getContext('2d');
+            artifactChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: dataset },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    scales: {
+                        x: { type: 'linear', title: { display: true, text: 'Time (s)' }, grid: { color: '#e0e0e0' } },
+                        y: { title: { display: true, text: 'Response (RU)' }, min: 0, max: maxY, grid: { color: '#e0e0e0' } }
+                    },
+                    plugins: { legend: { display: true } }
+                }
+            });
+        }
+
+        // Initialize all
         updateCalculator();
         updateChart();
-        setReplicateScenario('ideal'); // Default load for replicate chart
+        setReplicateScenario('ideal');
+        setFixState(false); 
     </script>
 </body>
 </html>
