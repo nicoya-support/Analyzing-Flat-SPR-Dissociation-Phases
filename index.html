@@ -25,6 +25,7 @@
             --yellow: #E9C259;
             --light-grey: #D9D9D9;
             --dark-grey: #3A3A3A;
+            --red: #E32636;
         }
 
         body {
@@ -123,9 +124,9 @@
         }
         
         .toggle-btn.active-artifact {
-            background-color: #E32636;
+            background-color: var(--red);
             color: white;
-            border-color: #E32636;
+            border-color: var(--red);
         }
 
         .toggle-btn.active-fixed {
@@ -154,6 +155,15 @@
             padding: 15px;
             margin-top: 15px;
             font-size: 0.95em;
+        }
+
+        .warning-box {
+            background-color: #fcebeb;
+            border-left: 3px solid var(--red);
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.95em;
+            display: none;
         }
 
         .comparison-table {
@@ -226,11 +236,11 @@
 
     <div class="card">
         <h2>2. SPR Kinetic Simulator</h2>
-        <p>Enter a target affinity ($K_D$) and select a scenario. The simulation automatically adjusts the concentration for slower kinetics. This ensures the interaction reaches sufficient signal amplitude for accurate visual comparison.</p>
+        <p>Enter a target affinity ($K_D$) and select a scenario. The simulator shows the data visually. The chart automatically scales the Y-axis so the interaction takes up the full viewing area. It also calculates the actual simulated affinity ($K_D$) dynamically if you alter the on-rate or off-rate boxes.</p>
         
         <div class="input-group" style="max-width: 300px; margin-bottom: 20px;">
             <label for="targetKdInput">Target Affinity ($K_D$) [M]:</label>
-            <input type="text" id="targetKdInput" value="1e-9">
+            <input type="text" id="targetKdInput" value="1.0 x 10^-9" oninput="setScenario(null, true)">
         </div>
 
         <div class="button-row">
@@ -250,19 +260,19 @@
             </div>
             <div class="input-group">
                 <label for="simKa">Association Rate ($k_a$) [1/Ms]:</label>
-                <input type="text" id="simKa" value="1e6" oninput="updateChart()">
+                <input type="text" id="simKa" value="1.0 x 10^6" oninput="updateChart()">
             </div>
             <div class="input-group">
                 <label for="simKd">Dissociation Rate ($k_d$) [1/s]:</label>
-                <input type="text" id="simKd" value="1e-3" oninput="updateChart()">
+                <input type="text" id="simKd" value="1.0 x 10^-3" oninput="updateChart()">
             </div>
             <div class="input-group">
-                <label for="simRmax">Maximum Signal ($R_{max}$) [RU]:</label>
+                <label for="simRmax">Maximum Capacity ($R_{max}$) [RU]:</label>
                 <input type="text" id="simRmax" value="100" oninput="updateChart()">
             </div>
             <div class="input-group">
                 <label for="simConc">Top Concentration [M]:</label>
-                <input type="text" id="simConc" value="1e-8" oninput="updateChart()">
+                <input type="text" id="simConc" value="1.0 x 10^-8" oninput="updateChart()">
             </div>
             <div class="input-group">
                 <label for="simTa">Association Time Step [s]:</label>
@@ -273,6 +283,13 @@
                 <input type="text" id="simTd" value="600" oninput="updateChart()">
             </div>
         </div>
+
+        <div id="kaWarningBox" class="warning-box">
+            <strong>Analysis Flag:</strong> The selected Association Rate ($k_a$) exceeds $1 \times 10^7$ M$^{-1}$s$^{-1}$. Analysis software typically cannot reliably calculate kinetic on-rates above this threshold because the binding occurs faster than mass transport can supply molecules to the surface.
+        </div>
+
+        <div id="actualKdDisplay" class="result-box" style="margin-top: 15px; padding: 10px;">
+            </div>
 
         <canvas id="sprChart"></canvas>
     </div>
@@ -363,8 +380,27 @@
     </div>
 
     <script>
-        // Formats numbers into scientific notation with HTML superscripts
-        function formatSciHtml(num) {
+        // Custom Parser for handling "1.0 x 10^-9", "1e-9", etc. safely
+        function parseInput(str) {
+            if (str === null || str === undefined) return NaN;
+            if (typeof str === 'number') return str;
+            let s = str.toString().toLowerCase().replace(/\s/g, '');
+            s = s.replace(/&times;/g, 'x');
+            s = s.replace(/[x*]10\^/g, 'e'); 
+            return parseFloat(s);
+        }
+
+        // Custom Formatter to replace default .toExponential() with standard notation
+        function formatInput(num) {
+            if (!num || num === 0) return "0";
+            let str = num.toExponential(1);
+            let parts = str.split('e');
+            let base = parts[0];
+            let exp = parseInt(parts[1], 10);
+            return `${base} x 10^${exp}`;
+        }
+
+        function formatSciHtmlRaw(num) {
             if (!num || num === 0) return "0";
             let str = num.toExponential(2);
             let parts = str.split('e');
@@ -375,7 +411,7 @@
 
         // Limit Calculator Function
         function updateCalculator() {
-            const td = parseFloat(document.getElementById('dissocTimeCalc').value);
+            const td = parseInput(document.getElementById('dissocTimeCalc').value);
             if (!td || td <= 0) return;
 
             const kdMin = 0.05129 / td;
@@ -391,7 +427,7 @@
             }
 
             document.getElementById('calcResult').innerHTML = `
-                <strong>Minimum measurable limit ($k_{d\\_min}$):</strong> ${formatSciHtml(kdMin)} s<sup>-1</sup><br><br>
+                <strong>Minimum measurable limit ($k_{d\\_min}$):</strong> ${formatSciHtmlRaw(kdMin)} s<sup>-1</sup><br><br>
                 <strong>Time required for 99% dissociation:</strong> ${timeString}
             `;
             
@@ -402,28 +438,49 @@
 
         // Kinetic Simulator Functions
         let chartInstance = null;
+        let lastTargetKD = null;
 
-        function setScenario(type) {
-            const targetKD = parseFloat(document.getElementById('targetKdInput').value) || 1e-9;
+        function setScenario(type, fromInput = false) {
+            const targetKD = parseInput(document.getElementById('targetKdInput').value) || 1e-9;
             let ka, kd;
 
-            if (type === 'fast') { ka = 1e7; } 
-            else if (type === 'medium') { ka = 1e6; } 
-            else if (type === 'slow') { ka = 1e5; } 
-            else if (type === 'limit') { ka = 1e4; }
-            kd = ka * targetKD;
+            // Reset times only if the user changed the target KD directly
+            if (targetKD !== lastTargetKD && fromInput) {
+                document.getElementById('simTa').value = 300; 
+                document.getElementById('simTd').value = 600; 
+                lastTargetKD = targetKD;
+            }
+
+            // If triggered by typing in the KD box, default to medium to update visual
+            if (!type) {
+                type = 'medium'; 
+            }
+
+            if (type === 'fast') { 
+                kd = 1e-2; 
+            } else if (type === 'medium') { 
+                kd = 1e-3; 
+            } else if (type === 'slow') { 
+                kd = 1e-4; 
+            } else if (type === 'limit') { 
+                kd = 1e-6; 
+            }
+            
+            ka = kd / targetKD;
 
             let topConc = targetKD * 10;
-            const targetKobs = 0.01;
-            const requiredConc = (targetKobs - kd) / ka;
+            const targetKobs = 0.01; 
             
-            if (requiredConc > topConc) { topConc = requiredConc; }
+            if (kd < targetKobs) {
+                const requiredConc = (targetKobs - kd) / ka;
+                if (requiredConc > topConc) { 
+                    topConc = requiredConc; 
+                }
+            }
 
-            document.getElementById('simKa').value = ka.toExponential(1);
-            document.getElementById('simKd').value = kd.toExponential(1);
-            document.getElementById('simConc').value = topConc.toExponential(1);
-            document.getElementById('simTa').value = 300; 
-            document.getElementById('simTd').value = 600; 
+            document.getElementById('simKa').value = formatInput(ka);
+            document.getElementById('simKd').value = formatInput(kd);
+            document.getElementById('simConc').value = formatInput(topConc);
 
             updateChart();
         }
@@ -447,12 +504,29 @@
 
         function updateChart() {
             const mode = document.getElementById('simMode').value;
-            const ka = parseFloat(document.getElementById('simKa').value);
-            const kd = parseFloat(document.getElementById('simKd').value);
-            const Rmax = parseFloat(document.getElementById('simRmax').value);
-            const topConc = parseFloat(document.getElementById('simConc').value);
-            const ta = parseFloat(document.getElementById('simTa').value);
-            const td = parseFloat(document.getElementById('simTd').value);
+            const ka = parseInput(document.getElementById('simKa').value);
+            const kd = parseInput(document.getElementById('simKd').value);
+            const Rmax = parseInput(document.getElementById('simRmax').value);
+            const topConc = parseInput(document.getElementById('simConc').value);
+            const ta = parseInput(document.getElementById('simTa').value);
+            const td = parseInput(document.getElementById('simTd').value);
+
+            const kaWarningBox = document.getElementById('kaWarningBox');
+            if (ka > 1e7) {
+                kaWarningBox.style.display = 'block';
+            } else {
+                kaWarningBox.style.display = 'none';
+            }
+
+            if (!isNaN(ka) && !isNaN(kd) && ka > 0) {
+                const actualKdValue = kd / ka;
+                document.getElementById('actualKdDisplay').innerHTML = `<strong>Actual Simulated Affinity (\\(K_D\\)):</strong> ${formatSciHtmlRaw(actualKdValue)} M`;
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise([document.getElementById('actualKdDisplay')]);
+                }
+            } else {
+                document.getElementById('actualKdDisplay').innerHTML = `<strong>Actual Simulated Affinity (\\(K_D\\)):</strong> Invalid Input`;
+            }
 
             if (isNaN(ka) || isNaN(kd) || isNaN(Rmax) || isNaN(topConc) || isNaN(ta) || isNaN(td)) return;
 
@@ -483,7 +557,15 @@
             }
 
             if (chartInstance) { chartInstance.destroy(); }
-            const cleanMax = Math.ceil(Rmax * 1.1);
+            
+            let maxDataY = 0;
+            datasets.forEach(ds => {
+                ds.data.forEach(pt => {
+                    if (pt.y > maxDataY) maxDataY = pt.y;
+                });
+            });
+            const dynamicMax = maxDataY > 0 ? maxDataY * 1.05 : Rmax;
+
             const ctx = document.getElementById('sprChart').getContext('2d');
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -493,8 +575,11 @@
                     animation: false,
                     scales: {
                         x: { type: 'linear', title: { display: true, text: 'Time (s)' }, grid: { color: '#e0e0e0' } },
-                        y: { title: { display: true, text: 'Response (RU)' }, min: 0, max: cleanMax, grid: { color: '#e0e0e0' },
-                            ticks: { callback: function(value) { return Math.floor(value) === value ? value : value.toFixed(1); } }
+                        y: { 
+                            title: { display: true, text: 'Response (RU)' }, 
+                            min: 0, 
+                            max: dynamicMax, 
+                            grid: { color: '#e0e0e0' }
                         }
                     },
                     plugins: {
@@ -507,6 +592,30 @@
                                         return item.datasetIndex === firstIndex;
                                     }
                                     return true;
+                                }
+                            },
+                            onClick: function(e, legendItem, legend) {
+                                const ci = legend.chart;
+                                if (legendItem.text === 'Dissociation') {
+                                    const firstIndex = ci.data.datasets.findIndex(ds => ds.label === 'Dissociation');
+                                    const isVisible = ci.isDatasetVisible(firstIndex);
+                                    
+                                    ci.data.datasets.forEach((ds, i) => {
+                                        if (ds.label === 'Dissociation') {
+                                            if (isVisible) {
+                                                ci.hide(i);
+                                            } else {
+                                                ci.show(i);
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    const index = legendItem.datasetIndex;
+                                    if (ci.isDatasetVisible(index)) {
+                                        ci.hide(index);
+                                    } else {
+                                        ci.show(index);
+                                    }
                                 }
                             }
                         }
@@ -813,6 +922,7 @@
         }
 
         // Initialize all
+        lastTargetKD = parseInput(document.getElementById('targetKdInput').value);
         updateCalculator();
         updateChart();
         setReplicateScenario('ideal');
