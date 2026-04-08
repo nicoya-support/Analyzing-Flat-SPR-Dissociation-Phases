@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyzing Flat SPR Dissociation Phases</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --dark-blue: #212B38;
+            --light-blue: #67CBDF;
+            --white: #FFFFFF;
+            --yellow: #E9C259;
+            --light-grey: #D9D9D9;
+            --dark-grey: #3A3A3A;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-grey);
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: transparent;
+        }
+
+        h1, h2, h3 {
+            color: var(--dark-blue);
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        .card {
+            padding: 25px;
+            margin-bottom: 25px;
+            border-top: 4px solid var(--light-blue);
+            border-left: 1px solid var(--light-grey);
+            border-right: 1px solid var(--light-grey);
+            border-bottom: 1px solid var(--light-grey);
+            border-radius: 4px;
+            background-color: var(--white);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--dark-blue);
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .result-box {
+            border: 1px solid var(--light-grey);
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid var(--dark-blue);
+            background-color: #fcfcfc;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--dark-blue);
+            color: var(--white);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--yellow);
+            color: var(--dark-blue);
+        }
+
+        canvas {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+
+        ol {
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .example-box {
+            background-color: #f0f7fa;
+            border-left: 3px solid var(--light-blue);
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Analyzing Flat SPR Dissociation Phases</h1>
+    
+    <p>Surface Plasmon Resonance (SPR) instruments measure molecular interactions. Data may exhibit a flat dissociation phase when molecules bind with high affinity. Kinetic analysis software frequently attempts to fit a mathematical model to this flat section. This results in the quantification of baseline instrument noise rather than the true biological interaction. Best practices dictate defining the lowest measurable limit of the instrument instead of reporting non-physical absolute values.</p>
+    
+    <p>A minimum signal decay of 5% is generally required to confirm an observable dissociation event. If the signal decays by less than 5% over the observed window, the true dissociation rate ($k_d$) cannot be accurately determined. An observable limit should be calculated for these scenarios.</p>
+
+    <div class="card">
+        <h2>1. The Limit Calculator</h2>
+        <p>The minimum observable dissociation rate ($k_{d\_min}$) depends on the duration of the dissociation phase ($t_d$). This utilizes a first-order exponential decay relationship.</p>
+        
+        <p>$$k_{d\_min}=\frac{-\ln(0.95)}{t_d}$$</p>
+
+        <div class="input-group">
+            <label for="dissocTimeCalc">Dissociation Time ($t_d$) in seconds:</label>
+            <input type="number" id="dissocTimeCalc" value="600" oninput="updateCalculator()">
+        </div>
+
+        <div class="result-box" id="calcResult">
+            </div>
+    </div>
+
+    <h2>Reporting Protocols</h2>
+    
+    <p>It is recommended practice to report flat dissociation data as limits rather than distinct numerical values. The $k_d$ is recorded as an inequality. This denotes it is less than the calculated minimum observable limit.</p>
+    
+    <p>The equilibrium dissociation constant ($K_D$) represents the ratio of the off-rate to the on-rate ($k_a$).</p>
+    
+    <p>$$K_D=\frac{k_d}{k_a}$$</p>
+    
+    <p>Calculate the $K_D$ limit using the $k_d$ limit and the measured $k_a$. The experimental methodology section should explicitly state that the minimum dissociation rate was determined utilizing a 5% signal loss threshold over the measured dissociation duration.</p>
+
+    <div class="example-box">
+        <strong>Reporting Example:</strong> 
+        <br><br>
+        If the mathematical fit yields a non-physical $k_d$ of $1.00 \times 10^{-6}$ s$^{-1}$ for a 600s dissociation phase, do not report it. Instead, utilize the calculated limit ($8.5 \times 10^{-5}$ s$^{-1}$). Assuming an accurately measured $k_a$ of $9.16 \times 10^{4}$ M$^{-1}$s$^{-1}$, the final reported parameters should look like this:
+        <br><br>
+        $$k_a = 9.16 \times 10^{4} \text{ M}^{-1}\text{s}^{-1}$$
+        $$k_d < 8.50 \times 10^{-5} \text{ s}^{-1}$$
+        $$K_D < 9.28 \times 10^{-10} \text{ M}$$
+    </div>
+
+    <div class="card">
+        <h2>2. SPR Kinetic Simulator</h2>
+        <p>Enter a target affinity ($K_D$) and select a scenario. The simulation automatically adjusts the concentration for slower kinetics. This ensures the interaction reaches sufficient signal amplitude for accurate visual comparison.</p>
+        
+        <div class="input-group" style="max-width: 300px; margin-bottom: 20px;">
+            <label for="targetKdInput">Target Affinity ($K_D$) [M]:</label>
+            <input type="text" id="targetKdInput" value="1e-9">
+        </div>
+
+        <div class="button-row">
+            <button onclick="setScenario('fast')">Fast Off-Rate</button>
+            <button onclick="setScenario('medium')">Medium Off-Rate</button>
+            <button onclick="setScenario('slow')">Slow Off-Rate</button>
+            <button onclick="setScenario('limit')">Below Machine Limit</button>
+        </div>
+
+        <div class="grid-2">
+            <div class="input-group">
+                <label for="simMode">Experiment Type:</label>
+                <select id="simMode" onchange="updateChart()">
+                    <option value="SCK">Single-Cycle Kinetics (SCK)</option>
+                    <option value="MCK">Multi-Cycle Kinetics (MCK)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="simKa">Association Rate ($k_a$) [1/Ms]:</label>
+                <input type="text" id="simKa" value="1e6" oninput="updateChart()">
+            </div>
+            <div class="input-group">
+                <label for="simKd">Dissociation Rate ($k_d$) [1/s]:</label>
+                <input type="text" id="simKd" value="1e-3" oninput="updateChart()">
+            </div>
+            <div class="input-group">
+                <label for="simRmax">Maximum Signal ($R_{max}$) [RU]:</label>
+                <input type="text" id="simRmax" value="100" oninput="updateChart()">
+            </div>
+            <div class="input-group">
+                <label for="simConc">Top Concentration [M]:</label>
+                <input type="text" id="simConc" value="1e-8" oninput="updateChart()">
+            </div>
+            <div class="input-group">
+                <label for="simTa">Association Time Step [s]:</label>
+                <input type="text" id="simTa" value="300" oninput="updateChart()">
+            </div>
+            <div class="input-group">
+                <label for="simTd">Final Dissociation Time ($t_d$) [s]:</label>
+                <input type="text" id="simTd" value="600" oninput="updateChart()">
+            </div>
+        </div>
+
+        <canvas id="sprChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Implementation in the Nicosystem</h2>
+        <p>You can force the software to recognize this physical limit by setting the parameter manually.</p>
+        <ol>
+            <li>Go to <strong>Model and Accommodation</strong>.</li>
+            <li>Set the $k_d$ to constant using the limit value which corresponds to your dissociation time.</li>
+            <li>Select <strong>Apply Locally</strong> to run the fit with this boundary.</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <h2>Handling Replicates and Baseline Variability</h2>
+        <p>When evaluating multiple replicates, slight variations in the baseline can occur. This is a common aspect of instrument performance. However, this variability can complicate analysis if the algorithm attempts to fit these minor fluctuations as true dissociation events. Ensure proper double-referencing is applied to remove systematic background noise. Buffer Blanks are available on SW ver 2.6.0+ to assist with this subtraction.</p>
+        
+        <p>If the sensorgrams remain largely flat but show minor differences, do not average the separate $k_d$ values generated by the software. Evaluate the total signal change over the dissociation period for each replicate relative to the 5% threshold.</p>
+
+        <div class="button-row">
+            <button onclick="setReplicateScenario('ideal')">Example 1: Consistent Flat Baselines</button>
+            <button onclick="setReplicateScenario('slight')">Example 2: Slight Variability</button>
+            <button onclick="setReplicateScenario('mixed')">Example 3: Mixed Results</button>
+        </div>
+
+        <div id="replicateDescription" class="example-box" style="margin-top: 0; margin-bottom: 20px;">
+            Select an example above to see how to handle different replicate scenarios.
+        </div>
+
+        <canvas id="replicateChart"></canvas>
+    </div>
+
+    <script>
+        function formatSciHtml(num) {
+            if (!num || num === 0) return "0";
+            let str = num.toExponential(2);
+            let parts = str.split('e');
+            let base = parts[0];
+            let exp = parseInt(parts[1], 10);
+            return `${base} &times; 10<sup>${exp}</sup>`;
+        }
+
+        function updateCalculator() {
+            const td = parseFloat(document.getElementById('dissocTimeCalc').value);
+            if (!td || td <= 0) return;
+
+            const kdMin = 0.05129 / td;
+            const timeToEmptySeconds = 4.605 / kdMin;
+            
+            let timeString = "";
+            if (timeToEmptySeconds < 3600) {
+                timeString = (timeToEmptySeconds / 60).toFixed(1) + " minutes";
+            } else if (timeToEmptySeconds < 86400) {
+                timeString = (timeToEmptySeconds / 3600).toFixed(1) + " hours";
+            } else {
+                timeString = (timeToEmptySeconds / 86400).toFixed(1) + " days";
+            }
+
+            document.getElementById('calcResult').innerHTML = `
+                <strong>Minimum measurable limit ($k_{d\\_min}$):</strong> ${formatSciHtml(kdMin)} s<sup>-1</sup><br><br>
+                <strong>Time required for 99% dissociation:</strong> ${timeString}
+            `;
+            
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([document.getElementById('calcResult')]);
+            }
+        }
+
+        // Sim Chart logic
+        function setScenario(type) {
+            const targetKD = parseFloat(document.getElementById('targetKdInput').value) || 1e-9;
+            let ka, kd;
+
+            if (type === 'fast') {
+                ka = 1e7;
+            } else if (type === 'medium') {
+                ka = 1e6;
+            } else if (type === 'slow') {
+                ka = 1e5;
+            } else if (type === 'limit') {
+                ka = 1e4; 
+            }
+            kd = ka * targetKD;
+
+            let topConc = targetKD * 10;
+            const targetKobs = 0.01;
+            const requiredConc = (targetKobs - kd) / ka;
+            
+            if (requiredConc > topConc) {
+                topConc = requiredConc;
+            }
+
+            document.getElementById('simKa').value = ka.toExponential(1);
+            document.getElementById('simKd').value = kd.toExponential(1);
+            document.getElementById('simConc').value = topConc.toExponential(1);
+            document.getElementById('simTa').value = 300; 
+            document.getElementById('simTd').value = 600; 
+
+            updateChart();
+        }
+
+        let chartInstance = null;
+
+        function simulatePhase(C, R0, duration, ka, kd, Rmax, isAssoc, startTime) {
+            let data = [];
+            let dt = duration / 100; 
+            for (let t = 0; t <= duration; t += dt) {
+                let r = 0;
+                if (isAssoc) {
+                    const req = (C * ka * Rmax) / (C * ka + kd);
+                    const kobs = C * ka + kd;
+                    r = req * (1 - Math.exp(-kobs * t)) + R0 * Math.exp(-kobs * t);
+                } else {
+                    r = R0 * Math.exp(-kd * t);
+                }
+                data.push({ x: startTime + t, y: r });
+            }
+            return data;
+        }
+
+        function updateChart() {
+            const mode = document.getElementById('simMode').value;
+            const ka = parseFloat(document.getElementById('simKa').value);
+            const kd = parseFloat(document.getElementById('simKd').value);
+            const Rmax = parseFloat(document.getElementById('simRmax').value);
+            const topConc = parseFloat(document.getElementById('simConc').value);
+            const ta = parseFloat(document.getElementById('simTa').value);
+            const td = parseFloat(document.getElementById('simTd').value);
+
+            if (isNaN(ka) || isNaN(kd) || isNaN(Rmax) || isNaN(topConc) || isNaN(ta) || isNaN(td)) return;
+
+            const concs = [
+                topConc / 81, 
+                topConc / 27, 
+                topConc / 9, 
+                topConc / 3, 
+                topConc
+            ];
+            
+            let datasets = [];
+            
+            const assocColors = [
+                '#9932CC', 
+                '#E32636', 
+                '#78C257', 
+                '#4DB8A6', 
+                '#F28E2B'  
+            ];
+            const dissocColor = '#59C3E3'; 
+
+            if (mode === "SCK") {
+                let currentTime = 0;
+                let currentR = 0;
+
+                for (let i = 0; i < concs.length; i++) {
+                    let phaseData = simulatePhase(concs[i], currentR, ta, ka, kd, Rmax, true, currentTime);
+                    
+                    datasets.push({
+                        label: `Conc ${i+1}`,
+                        data: phaseData,
+                        borderColor: assocColors[i],
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    });
+
+                    currentTime += ta;
+                    currentR = phaseData[phaseData.length - 1].y;
+                }
+                
+                let dissocData = simulatePhase(0, currentR, td, ka, kd, Rmax, false, currentTime);
+                datasets.push({
+                    label: `Dissociation`,
+                    data: dissocData,
+                    borderColor: dissocColor,
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 0
+                });
+
+            } else {
+                for (let i = 0; i < concs.length; i++) {
+                    let assocData = simulatePhase(concs[i], 0, ta, ka, kd, Rmax, true, 0);
+                    let lastR = assocData[assocData.length - 1].y;
+                    let dissocData = simulatePhase(0, lastR, td, ka, kd, Rmax, false, ta);
+
+                    datasets.push({
+                        label: `Conc ${i+1}`,
+                        data: assocData,
+                        borderColor: assocColors[i],
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    });
+
+                    datasets.push({
+                        label: `Dissociation`,
+                        data: dissocData,
+                        borderColor: dissocColor,
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    });
+                }
+            }
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const cleanMax = Math.ceil(Rmax * 1.1);
+            const ctx = document.getElementById('sprChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Time (s)' },
+                            grid: { color: '#e0e0e0' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Response (RU)' },
+                            min: 0,
+                            max: cleanMax,
+                            grid: { color: '#e0e0e0' },
+                            ticks: {
+                                callback: function(value) {
+                                    if (Math.floor(value) === value) return value;
+                                    return value.toFixed(1);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            labels: {
+                                filter: function(item, data) {
+                                    if (item.text === 'Dissociation') {
+                                        const firstIndex = data.datasets.findIndex(ds => ds.label === 'Dissociation');
+                                        return item.datasetIndex === firstIndex;
+                                    }
+                                    return true;
+                                }
+                            },
+                            onClick: function(e, legendItem, legend) {
+                                const ci = legend.chart;
+                                const label = legendItem.text;
+
+                                if (label === 'Dissociation') {
+                                    const firstIndex = ci.data.datasets.findIndex(ds => ds.label === 'Dissociation');
+                                    const isVisible = ci.isDatasetVisible(firstIndex);
+
+                                    ci.data.datasets.forEach((ds, i) => {
+                                        if (ds.label === 'Dissociation') {
+                                            if (isVisible) {
+                                                ci.hide(i);
+                                            } else {
+                                                ci.show(i);
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    const index = legendItem.datasetIndex;
+                                    if (ci.isDatasetVisible(index)) {
+                                        ci.hide(index);
+                                    } else {
+                                        ci.show(index);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Replicate Chart Logic
+        let repChartInstance = null;
+
+        function setReplicateScenario(type) {
+            let datasets = [];
+            const duration = 600;
+            const points = 100;
+            const dt = duration / points;
+            
+            // Replicate Colors
+            const repColors = ['#212B38', '#67CBDF', '#E9C259'];
+            
+            let data1 = [], data2 = [], data3 = [];
+            let descText = "";
+
+            // Threshold line data (95 RU)
+            let thresholdData = [];
+            for (let t = 0; t <= duration; t += dt) {
+                thresholdData.push({ x: t, y: 95 });
+            }
+
+            if (type === 'ideal') {
+                descText = "<strong>Example 1: Consistent Flat Baselines.</strong> All replicates decay by less than 5%. Calculate $k_{d\\_min}$ based on the observation time and report this limit for the entire dataset.";
+                for (let t = 0; t <= duration; t += dt) {
+                    data1.push({ x: t, y: 100 - (t * 0.001) });
+                    data2.push({ x: t, y: 100 - (t * 0.0015) });
+                    data3.push({ x: t, y: 100 - (t * 0.0005) });
+                }
+            } else if (type === 'slight') {
+                descText = "<strong>Example 2: Slight Variability.</strong> The baseline varies between replicates (one drifts slightly up, another down), but none cross the 5% decay threshold. Do not average the values. Report the calculated limit, as the variance falls within the instrument noise threshold.";
+                for (let t = 0; t <= duration; t += dt) {
+                    data1.push({ x: t, y: 100 + (t * 0.002) }); // Upward drift
+                    data2.push({ x: t, y: 100 - (t * 0.004) }); // Downward drift, still above 95
+                    data3.push({ x: t, y: 100 - (t * 0.001) }); // Flat
+                }
+            } else if (type === 'mixed') {
+                descText = "<strong>Example 3: Mixed Results.</strong> One replicate decays beyond the 5% threshold, while the others remain flat. You cannot average a true numerical value with a limit. Evaluate the methodology for the outlier, or report the single measurable $k_d$ while noting the others were below the detection limit.";
+                for (let t = 0; t <= duration; t += dt) {
+                    data1.push({ x: t, y: 100 - (t * 0.001) }); // Flat
+                    data2.push({ x: t, y: 100 - (t * 0.015) }); // Decays past 95
+                    data3.push({ x: t, y: 100 - (t * 0.002) }); // Flat
+                }
+            }
+
+            document.getElementById('replicateDescription').innerHTML = descText;
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([document.getElementById('replicateDescription')]);
+            }
+
+            datasets = [
+                {
+                    label: 'Replicate 1',
+                    data: data1,
+                    borderColor: repColors[0],
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Replicate 2',
+                    data: data2,
+                    borderColor: repColors[1],
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Replicate 3',
+                    data: data3,
+                    borderColor: repColors[2],
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: '5% Decay Threshold',
+                    data: thresholdData,
+                    borderColor: '#E32636', // Red
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                }
+            ];
+
+            if (repChartInstance) {
+                repChartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('replicateChart').getContext('2d');
+            repChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Time (s)' },
+                            grid: { color: '#e0e0e0' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Normalized Response (RU)' },
+                            min: 80,
+                            max: 110,
+                            grid: { color: '#e0e0e0' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true }
+                    }
+                }
+            });
+        }
+
+        // Initialize everything
+        updateCalculator();
+        updateChart();
+        setReplicateScenario('ideal'); // Default load for replicate chart
+    </script>
+</body>
+</html>
